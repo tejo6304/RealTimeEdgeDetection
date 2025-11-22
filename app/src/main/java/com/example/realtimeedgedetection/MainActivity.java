@@ -108,7 +108,6 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "onCreate");
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        setSupportActionBar(binding.toolbar);
 
         binding.textureView.setSurfaceTextureListener(textureListener);
 
