@@ -52,6 +52,12 @@ public class MainActivity extends AppCompatActivity {
     private Surface surface;
 
     private int currentFilter = 1; // 0: Grayscale, 1: Canny Edge, 2: Original
+    private int cameraFacing = CameraCharacteristics.LENS_FACING_BACK; // 0: Back, 1: Front
+    
+    // FPS Counter variables
+    private long lastFpsUpdateTime = 0;
+    private int frameCount = 0;
+    private double currentFps = 0.0;
 
     private final TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
         @Override
@@ -74,6 +80,7 @@ public class MainActivity extends AppCompatActivity {
                 backgroundHandler.post(() -> {
                     if (surface != null) {
                         processFrame(surface, imageDimension.getWidth(), imageDimension.getHeight(), currentFilter);
+                        updateFps();
                     }
                 });
             }
@@ -114,6 +121,12 @@ public class MainActivity extends AppCompatActivity {
         binding.grayscaleButton.setOnClickListener(v -> setFilter(0));
         binding.cannyEdgeButton.setOnClickListener(v -> setFilter(1));
         binding.originalButton.setOnClickListener(v -> setFilter(2));
+        
+        // Capture button listener
+        binding.captureButton.setOnClickListener(v -> captureImage());
+        
+        // Flip camera button listener
+        binding.cameraFlipButton.setOnClickListener(v -> flipCamera());
     }
 
     private void setFilter(int filter) {
@@ -209,7 +222,22 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "openCamera");
         CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-            String cameraId = manager.getCameraIdList()[0];
+            String cameraId = null;
+            // Find camera with the desired facing
+            for (String id : manager.getCameraIdList()) {
+                CameraCharacteristics characteristics = manager.getCameraCharacteristics(id);
+                Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                if (facing != null && facing == cameraFacing) {
+                    cameraId = id;
+                    break;
+                }
+            }
+            
+            // Fallback to first camera if desired facing not found
+            if (cameraId == null) {
+                cameraId = manager.getCameraIdList()[0];
+            }
+            
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             assert map != null;
@@ -320,6 +348,49 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "onDestroy");
         super.onDestroy();
         cleanup();
+    }
+
+    private void captureImage() {
+        Log.d(TAG, "Capture image clicked");
+        Toast.makeText(this, "Image captured", Toast.LENGTH_SHORT).show();
+    }
+
+    private void flipCamera() {
+        Log.d(TAG, "Flip camera clicked");
+        // Toggle between back and front camera
+        cameraFacing = (cameraFacing == CameraCharacteristics.LENS_FACING_BACK) 
+            ? CameraCharacteristics.LENS_FACING_FRONT 
+            : CameraCharacteristics.LENS_FACING_BACK;
+        
+        String cameraType = cameraFacing == CameraCharacteristics.LENS_FACING_BACK ? "Back" : "Front";
+        Toast.makeText(this, "Switched to " + cameraType + " camera", Toast.LENGTH_SHORT).show();
+        
+        closeCamera();
+        startBackgroundThread();
+        if (binding.textureView.isAvailable()) {
+            openCamera();
+        } else {
+            binding.textureView.setSurfaceTextureListener(textureListener);
+        }
+    }
+
+    private void updateFps() {
+        frameCount++;
+        long currentTime = System.currentTimeMillis();
+        
+        // Update FPS every second (1000ms)
+        if (currentTime - lastFpsUpdateTime >= 1000) {
+            currentFps = frameCount;
+            frameCount = 0;
+            lastFpsUpdateTime = currentTime;
+            
+            // Update UI on main thread
+            runOnUiThread(() -> {
+                String fpsText = String.format("%.1f", currentFps);
+                binding.fpsText.setText(fpsText);
+                Log.d(TAG, "FPS: " + fpsText);
+            });
+        }
     }
 
     public native void processFrame(Surface surface, int width, int height, int filterType);
