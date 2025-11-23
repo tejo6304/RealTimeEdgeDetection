@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![App Demo](/IMG-20251123-WA0003.jpg)
+
 
 **A high-performance Android camera application with real-time image processing capabilities**
 
@@ -67,22 +67,22 @@ The DataFlowController manages the entire processing pipeline, coordinating data
     <td align="center">
       <img src="/IMG-20251123-WA0003.jpg" width="200px" />
       <br />
-      <em>Main Camera View</em>
+      <em>Canny Edge View</em>
     </td>
     <td align="center">
       <img src="/IMG-20251123-WA0004.jpg" width="200px" />
       <br />
-      <em>Edge Detection Filter</em>
+      <em>Grayscale View</em>
     </td>
     <td align="center">
       <img src="/IMG-20251123-WA0005.jpg" width="200px" />
       <br />
-      <em>Grayscale Filter</em>
+      <em>Raw Image</em>
     </td>
     <td align="center">
       <img src="/IMG-20251123-WA0006.jpg" width="200px" />
       <br />
-      <em>Filter UI Controls</em>
+      <em>Homepage</em>
     </td>
   </tr>
 </table>
