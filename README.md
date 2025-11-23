@@ -91,9 +91,10 @@ The DataFlowController manages the entire processing pipeline, coordinating data
 
 ## 🎬 Demo Video
 
-https://github.com/user-attachments/assets/your-video-id-here
+https://github.com/tejo6304/RealTimeEdgeDetection/blob/master/VID-20251123-WA0002.mp4
 
-> **Note**: Upload `/VID-20251123-WA0002.mp4` to GitHub releases or use a video hosting service, then update the link above.
+
+
 
 ---
 
