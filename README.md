@@ -597,7 +597,7 @@ The following features are planned for future development:
 
 <div align="center">
 
-**Made with ❤️ using Android, OpenCV, and JNI**
+**Made using Android Studio, OpenCV, and JNI**
 
 ⭐ Star this repo if you find it useful!
 
