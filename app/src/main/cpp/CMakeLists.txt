@@ -5,45 +5,43 @@
 # Sets the minimum CMake version required for this project.
 cmake_minimum_required(VERSION 3.22.1)
 
-# Declares the project name. The project name can be accessed via ${ PROJECT_NAME},
-# Since this is the top level CMakeLists.txt, the project name is also accessible
-# with ${CMAKE_PROJECT_NAME} (both CMake variables are in-sync within the top level
-# build script scope).
+# Declares the project name
 project("realtimeedgedetection")
 
-# Creates and names a library, sets it as either STATIC
-# or SHARED, and provides the relative paths to its source code.
-# You can define multiple libraries, and CMake builds them for you.
-# Gradle automatically packages shared libraries with your APK.
-#
-# In this top level CMakeLists.txt, ${CMAKE_PROJECT_NAME} is used to define
-# the target library name; in the sub-module's CMakeLists.txt, ${PROJECT_NAME}
-# is preferred for the same purpose.
-#
-# In order to load a library into your app from Java/Kotlin, you must call
-# System.loadLibrary() and pass the name of the library defined here;
-# for GameActivity/NativeActivity derived applications, the same library name must be
-# used in the AndroidManifest.xml file.
+# Set C++ standard to C++11 with RTTI and exceptions enabled
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -frtti -fexceptions")
 
-set(OpenCV_DIR ../sdk/native/jni)
-find_package(OpenCV REQUIRED)
+# Find and link OpenCV
+set(OpenCV_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../sdk/native/jni")
+find_package(OpenCV REQUIRED PATHS "${OpenCV_DIR}" NO_DEFAULT_PATH)
+
+# Include OpenCV header directories
 include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+# Create shared library
 add_library(${CMAKE_PROJECT_NAME} SHARED
-        # List C/C++ source files with relative paths to this CMakeLists.txt.
-        native-lib.cpp)
+        native-lib.cpp
+        image_processor.cpp)
 
+# Find system libraries
 find_library(jnigraphics-lib jnigraphics)
 find_library(log-lib log)
 
-# Specifies libraries CMake should link to your target library. You
-# can link libraries from various origins, such as libraries defined in this
-# build script, prebuilt third-party libraries, or Android system libraries.
+# Link libraries to target
 target_link_libraries(${CMAKE_PROJECT_NAME}
-        # List libraries link to the target library
         ${jnigraphics-lib}
         EGL
         GLESv2
         android
         ${log-lib}
         ${OpenCV_LIBS})
+
+# Set compiler flags for optimization and debugging
+if(CMAKE_BUILD_TYPE MATCHES Release)
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -O2)
+else()
+    target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -g)
+endif()

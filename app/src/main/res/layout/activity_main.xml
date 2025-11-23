@@ -82,10 +82,25 @@
                         android:scaleType="centerInside"
                         android:src="@drawable/ic_record"
                         android:contentDescription="Capture"
+                        android:elevation="10dp"
                         app:layout_constraintBottom_toBottomOf="parent"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintStart_toStartOf="parent"
                         android:layout_margin="16dp" />
+
+                    <!-- Gallery Button (Bottom Left) -->
+                    <ImageButton
+                        android:id="@+id/gallery_button"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:background="@drawable/round_button_background"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/ic_gallery"
+                        android:contentDescription="Gallery"
+                        android:elevation="10dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        android:layout_margin="12dp" />
 
                     <!-- Flip Camera Button (Bottom Right) -->
                     <ImageButton
@@ -96,6 +111,7 @@
                         android:scaleType="centerInside"
                         android:src="@drawable/ic_flip_camera"
                         android:contentDescription="Flip Camera"
+                        android:elevation="10dp"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintBottom_toBottomOf="parent"
                         android:layout_margin="12dp" />
@@ -219,6 +235,7 @@
                     android:layout_marginEnd="4dp"
                     android:backgroundTint="#007AFF"
                     android:text="Canny Edge"
+                    android:textColor="@android:color/white"
                     android:textSize="12sp" />
 
                 <Button

@@ -10,4 +10,6 @@
 
     <color name="active_button">#007AFF</color>
     <color name="inactive_button">#424242</color>
+    <color name="dark_gray">#1A1A1A</color>
+    <color name="button_background">#2A2A2A</color>
 </resources>

@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    kotlin("android") version "1.9.20"
 }
 
 android {
@@ -36,6 +37,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    
+    kotlinOptions {
+        jvmTarget = "11"
+    }
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
@@ -50,6 +55,9 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    lint {
+        disable += "UnsafeOptInUsageError"
+    }
 }
 
 
@@ -57,6 +65,10 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.constraintlayout)
+    
+    // Kotlin
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.20")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     
     // CameraX dependencies
     implementation(libs.camerax.core)
@@ -66,6 +78,9 @@ dependencies {
     
     // Lifecycle
     implementation(libs.lifecycle.runtime)
+    
+    // Gson for JSON serialization
+    implementation("com.google.code.gson:gson:2.10.1")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

@@ -1,8 +1,12 @@
 package com.example.realtimeedgedetection;
 
 import android.Manifest;
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -11,6 +15,9 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.Image;
+import android.media.ImageReader;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -28,6 +35,8 @@ import androidx.core.content.ContextCompat;
 
 import com.example.realtimeedgedetection.databinding.ActivityMainBinding;
 
+import java.io.File;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -58,6 +67,15 @@ public class MainActivity extends AppCompatActivity {
     private long lastFpsUpdateTime = 0;
     private int frameCount = 0;
     private double currentFps = 0.0;
+    
+    // Image storage
+    private ImageStorageUtils imageStorageUtils;
+    
+    // Real-time frame processor
+    private RealtimeFrameProcessor frameProcessor;
+    
+    // Photo mode handler
+    private PhotoMode photoMode;
 
     private final TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
         @Override
@@ -76,11 +94,14 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surfaceTexture) {
-            if (cameraDevice != null && backgroundHandler != null) {
+            updateFps();
+            
+            // Update filter in JNI layer
+            if (backgroundHandler != null && imageDimension != null) {
                 backgroundHandler.post(() -> {
-                    if (surface != null) {
-                        processFrame(surface, imageDimension.getWidth(), imageDimension.getHeight(), currentFilter);
-                        updateFps();
+                    if (currentFilter >= 0 && currentFilter <= 2) {
+                        // Signal the native layer about the current filter
+                        notifyFilterChange(currentFilter);
                     }
                 });
             }
@@ -109,6 +130,12 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    // Web server for remote viewing
+    private WebServerManager webServerManager;
+    
+    // Data flow controller for pipeline management
+    private DataFlowController dataFlowController;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -116,26 +143,81 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        // Initialize image storage utility
+        imageStorageUtils = new ImageStorageUtils(this);
+        
+        // Initialize frame processor
+        frameProcessor = new RealtimeFrameProcessor(binding.textureView);
+        
+        // Initialize web server for remote viewing (optional)
+        webServerManager = new WebServerManager(this);
+        
+        // Initialize data flow controller
+        dataFlowController = new DataFlowController(this);
+        dataFlowController.initialize();
+        
         binding.textureView.setSurfaceTextureListener(textureListener);
 
-        binding.grayscaleButton.setOnClickListener(v -> setFilter(0));
-        binding.cannyEdgeButton.setOnClickListener(v -> setFilter(1));
-        binding.originalButton.setOnClickListener(v -> setFilter(2));
+        binding.grayscaleButton.setOnClickListener(v -> {
+            Log.d(TAG, "Grayscale button clicked");
+            setFilter(0);
+        });
+        binding.cannyEdgeButton.setOnClickListener(v -> {
+            Log.d(TAG, "Canny Edge button clicked");
+            setFilter(1);
+        });
+        binding.originalButton.setOnClickListener(v -> {
+            Log.d(TAG, "Original button clicked");
+            setFilter(2);
+        });
         
         // Capture button listener
-        binding.captureButton.setOnClickListener(v -> captureImage());
+        binding.captureButton.setOnClickListener(v -> {
+            Log.d(TAG, "Capture button clicked - starting capture");
+            captureImage();
+        });
+        
+        // Gallery button listener
+        binding.galleryButton.setOnClickListener(v -> {
+            Log.d(TAG, "Gallery button clicked");
+            openGallery();
+        });
         
         // Flip camera button listener
-        binding.cameraFlipButton.setOnClickListener(v -> flipCamera());
+        binding.cameraFlipButton.setOnClickListener(v -> {
+            Log.d(TAG, "Flip camera button clicked");
+            flipCamera();
+        });
     }
 
     private void setFilter(int filter) {
         Log.d(TAG, "setFilter: " + filter);
         currentFilter = filter;
+        frameProcessor.setFilterType(filter);
+        if (photoMode != null) {
+            photoMode.setFilterType(filter);
+        } else {
+            Log.w(TAG, "PhotoMode not initialized yet");
+        }
         updateButtonStyles();
         binding.filterText.setText(getFilterName(filter));
+        
+        // Try to apply filter to current preview frame
+        applyFilterToPreview(filter);
     }
-
+    
+    private void applyFilterToPreview(int filterType) {
+        // This method notifies the native layer which filter to apply
+        // The actual filter application happens in the camera preview rendering
+        if (backgroundHandler != null) {
+            backgroundHandler.post(() -> {
+                // Signal to native layer that filter has changed
+                notifyFilterChange(filterType);
+                Log.d(TAG, "Filter change notified to native layer: " + filterType);
+            });
+        }
+    }
+    
     private String getFilterName(int filter) {
         switch (filter) {
             case 0:
@@ -216,6 +298,18 @@ public class MainActivity extends AppCompatActivity {
         } catch (CameraAccessException e) {
             Log.e(TAG, "createCameraPreview: ", e);
         }
+    }
+    
+    private void setupImageReader(int width, int height) {
+        // Placeholder - not actively used in current implementation
+    }
+    
+    private void processFrameForFilter(Image image, int filterType) {
+        // Placeholder - not actively used in current implementation
+    }
+    
+    private Bitmap convertImageToBitmap(Image image) {
+        return null;
     }
 
     private void openCamera() {
@@ -328,6 +422,16 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         Log.d(TAG, "onResume");
         startBackgroundThread();
+        
+        // Start web server and data flow pipeline
+        dataFlowController.startPipeline();
+        webServerManager.startServer();
+        
+        // Initialize photo mode after background thread is ready
+        if (photoMode == null) {
+            photoMode = new PhotoMode(this, binding.textureView, backgroundHandler);
+        }
+        
         if (binding.textureView.isAvailable()) {
             openCamera();
         } else {
@@ -338,6 +442,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         Log.d(TAG, "onPause");
+        
+        // Stop web server and data flow pipeline
+        dataFlowController.stopPipeline();
+        webServerManager.stopServer();
+        
         closeCamera();
         stopBackgroundThread();
         super.onPause();
@@ -346,13 +455,55 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         Log.d(TAG, "onDestroy");
+        if (photoMode != null) {
+            photoMode.cleanup();
+        }
         super.onDestroy();
         cleanup();
     }
 
     private void captureImage() {
         Log.d(TAG, "Capture image clicked");
-        Toast.makeText(this, "Image captured", Toast.LENGTH_SHORT).show();
+        
+        photoMode.capturePhotoWithFilter(
+            bitmap -> {
+                if (bitmap != null) {
+                    Log.d(TAG, "Original bitmap captured successfully");
+                }
+            },
+            bitmap -> {
+                if (bitmap != null) {
+                    Log.d(TAG, "Image processed successfully");
+                    // Save the processed image
+                    photoMode.saveCapturedImage(bitmap, imageStorageUtils, file -> {
+                        if (file != null) {
+                            Toast.makeText(MainActivity.this, "Image saved: " + file.getName(), Toast.LENGTH_SHORT).show();
+                            Log.d(TAG, "Image saved to: " + file.getAbsolutePath());
+                        } else {
+                            Toast.makeText(MainActivity.this, "Failed to save image", Toast.LENGTH_SHORT).show();
+                            Log.e(TAG, "Failed to save image");
+                        }
+                    });
+                } else {
+                    Toast.makeText(MainActivity.this, "Failed to process image", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Image processing failed");
+                }
+            }
+        );
+    }
+
+    private void openGallery() {
+        Log.d(TAG, "Gallery button clicked");
+        
+        try {
+            // Open WebViewerActivity which displays captured images with filters
+            Intent intent = new Intent(MainActivity.this, WebViewerActivity.class);
+            startActivity(intent);
+            Log.d(TAG, "Opening web viewer gallery");
+        } catch (Exception e) {
+            Toast.makeText(this, "Error opening gallery: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error opening gallery: " + e.getMessage(), e);
+        }
     }
 
     private void flipCamera() {
@@ -394,5 +545,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public native void processFrame(Surface surface, int width, int height, int filterType);
+    public native void notifyFilterChange(int filterType);
     public native void cleanup();
 }
