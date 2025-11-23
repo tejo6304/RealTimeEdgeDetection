@@ -1,0 +1,651 @@
+package com.example.realtimeedgedetection
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.Build
+import android.os.Bundle
+import android.util.Log
+import android.view.View
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.example.realtimeedgedetection.databinding.ActivityMainBinding
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+
+/**
+ * Enhanced MainActivity with comprehensive features:
+ * - CameraX API for camera lifecycle management
+ * - UI mode switching (camera, gallery, settings)
+ * - JNI interface for native C++ image processing
+ * - OpenGL ES GPU-accelerated rendering
+ * - Image capture and file storage with proper permissions
+ *
+ * @author Enhanced Implementation
+ * @date 2025-11-22
+ */
+class MainActivityEnhanced : AppCompatActivity() {
+
+    companion object {
+        private const val TAG = "MainActivityEnhanced"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
+        private val REQUIRED_PERMISSIONS = arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        )
+
+        // JNI Methods
+        external fun initializeNative(): Boolean
+        external fun processFrameNative(inputData: ByteArray, width: Int, height: Int, filterType: Int): ByteArray?
+        external fun setFilterNative(filterType: Int): Boolean
+        external fun cleanupNative()
+        external fun initializeOpenGLNative(eglDisplay: Long, eglContext: Long, eglSurface: Long): Boolean
+        external fun renderFrameNative(textureId: Int, width: Int, height: Int): Boolean
+        
+        init {
+            try {
+                System.loadLibrary("realtimeedgedetection")
+                Log.d(TAG, "Native library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.e(TAG, "Failed to load native library: ${e.message}")
+            }
+        }
+    }
+
+    // UI Binding
+    private lateinit var binding: ActivityMainBinding
+
+    // Camera Components (CameraX)
+    private lateinit var cameraExecutor: ExecutorService
+    private var imageCapture: ImageCapture? = null
+    private var cameraProvider: ProcessCameraProvider? = null
+
+    // State Management
+    private var currentMode = AppMode.CAMERA
+    private var currentFilter = FilterType.CANNY_EDGE
+    private var cameraLensDirection = CameraSelector.LENS_FACING_BACK
+    private var isProcessing = false
+
+    // Performance Monitoring
+    private var frameCount = 0
+    private var lastFpsUpdateTime = System.currentTimeMillis()
+    private var currentFps = 0.0
+
+    // File and Storage
+    private lateinit var outputDirectory: File
+    private val imageStorageUtils by lazy { ImageStorageUtils(this) }
+
+    // OpenGL Components
+    private var glRenderer: OpenGLRenderer? = null
+    private var isGLInitialized = false
+
+    // Lifecycle
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        Log.d(TAG, "MainActivity created")
+
+        // Initialize components
+        initializePermissions()
+        initializeCameraExecutor()
+        initializeNativeLayer()
+        initializeUIHandlers()
+        initializeStorageDirectory()
+        setupCameraMode()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.d(TAG, "MainActivity resumed")
+        
+        if (allPermissionsGranted()) {
+            when (currentMode) {
+                AppMode.CAMERA -> setupCameraMode()
+                AppMode.GALLERY -> setupGalleryMode()
+                AppMode.SETTINGS -> setupSettingsMode()
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Log.d(TAG, "MainActivity paused")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d(TAG, "MainActivity destroyed")
+        
+        // Cleanup
+        cameraExecutor.shutdown()
+        cleanupNative()
+        glRenderer?.cleanup()
+    }
+
+    // ==================== PERMISSIONS ====================
+
+    /**
+     * Initialize and check runtime permissions
+     */
+    private fun initializePermissions() {
+        if (!allPermissionsGranted()) {
+            ActivityCompat.requestPermissions(
+                this,
+                REQUIRED_PERMISSIONS,
+                REQUEST_CODE_PERMISSIONS
+            )
+        }
+    }
+
+    /**
+     * Check if all required permissions are granted
+     */
+    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CODE_PERMISSIONS) {
+            if (allPermissionsGranted()) {
+                Log.d(TAG, "All permissions granted")
+                setupCameraMode()
+            } else {
+                Log.e(TAG, "Permissions not granted")
+                Toast.makeText(this, "Permissions not granted", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ==================== INITIALIZATION ====================
+
+    /**
+     * Initialize camera executor for background processing
+     */
+    private fun initializeCameraExecutor() {
+        cameraExecutor = Executors.newSingleThreadExecutor()
+        Log.d(TAG, "Camera executor initialized")
+    }
+
+    /**
+     * Initialize native C++ layer via JNI
+     */
+    private fun initializeNativeLayer() {
+        try {
+            val result = initializeNative()
+            if (result) {
+                Log.d(TAG, "Native layer initialized successfully")
+            } else {
+                Log.e(TAG, "Failed to initialize native layer")
+                Toast.makeText(this, "Native initialization failed", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception during native initialization: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Initialize UI event handlers
+     */
+    private fun initializeUIHandlers() {
+        // Camera button
+        binding.captureButton.setOnClickListener {
+            captureImage()
+        }
+
+        // Gallery button
+        binding.galleryButton.setOnClickListener {
+            switchToGalleryMode()
+        }
+
+        // Camera flip button
+        binding.cameraFlipButton.setOnClickListener {
+            flipCamera()
+        }
+
+        // Filter buttons
+        binding.grayscaleButton.setOnClickListener {
+            setFilter(FilterType.GRAYSCALE)
+        }
+
+        binding.cannyEdgeButton.setOnClickListener {
+            setFilter(FilterType.CANNY_EDGE)
+        }
+
+        binding.originalButton.setOnClickListener {
+            setFilter(FilterType.ORIGINAL)
+        }
+
+        // Settings button (if exists)
+        try {
+            val settingsButton = binding.root.findViewById<View>(R.id.settings_button)
+            settingsButton?.setOnClickListener {
+                switchToSettingsMode()
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Settings button not found")
+        }
+
+        Log.d(TAG, "UI handlers initialized")
+    }
+
+    /**
+     * Initialize storage directory for captured images
+     */
+    private fun initializeStorageDirectory() {
+        outputDirectory = imageStorageUtils.getOutputDirectory()
+        Log.d(TAG, "Storage directory initialized: ${outputDirectory.absolutePath}")
+    }
+
+    // ==================== CAMERA MODE ====================
+
+    /**
+     * Setup camera mode with CameraX
+     */
+    private fun setupCameraMode() {
+        currentMode = AppMode.CAMERA
+        Log.d(TAG, "Setting up camera mode")
+
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+
+        cameraProviderFuture.addListener({
+            try {
+                cameraProvider = cameraProviderFuture.get()
+
+                // Preview
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(binding.previewView.surfaceProvider)
+                }
+
+                // Image capture
+                imageCapture = ImageCapture.Builder()
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                    .build()
+
+                // Select camera (back by default)
+                val cameraSelector = CameraSelector.Builder()
+                    .requireLensFacing(cameraLensDirection)
+                    .build()
+
+                // Unbind any existing use cases
+                cameraProvider?.unbindAll()
+
+                // Bind to lifecycle
+                cameraProvider?.bindToLifecycle(
+                    this,
+                    cameraSelector,
+                    preview,
+                    imageCapture
+                )
+
+                Log.d(TAG, "Camera setup successful")
+                showToast("Camera ready")
+
+            } catch (exc: Exception) {
+                Log.e(TAG, "Use case binding failed", exc)
+                showToast("Camera setup failed: ${exc.message}")
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    /**
+     * Flip between front and back camera
+     */
+    private fun flipCamera() {
+        cameraLensDirection = if (cameraLensDirection == CameraSelector.LENS_FACING_BACK) {
+            CameraSelector.LENS_FACING_FRONT
+        } else {
+            CameraSelector.LENS_FACING_BACK
+        }
+        
+        Log.d(TAG, "Camera flipped to: ${if (cameraLensDirection == CameraSelector.LENS_FACING_BACK) "Back" else "Front"}")
+        setupCameraMode()
+    }
+
+    // ==================== IMAGE CAPTURE ====================
+
+    /**
+     * Capture image from camera preview using CameraX
+     */
+    private fun captureImage() {
+        val imageCapture = imageCapture ?: run {
+            Log.e(TAG, "ImageCapture not initialized")
+            return
+        }
+
+        if (isProcessing) {
+            Log.w(TAG, "Already processing an image")
+            return
+        }
+
+        isProcessing = true
+
+        // Create output file
+        val photoFile = File(
+            outputDirectory,
+            SimpleDateFormat(FILENAME_FORMAT, Locale.US).format(System.currentTimeMillis()) + ".jpg"
+        )
+
+        // Create output options
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+
+        // Capture image
+        imageCapture.takePicture(
+            outputOptions,
+            cameraExecutor,
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    Log.d(TAG, "Image captured: ${photoFile.absolutePath}")
+                    showToast("Image saved: ${photoFile.name}")
+                    
+                    // Process captured image with filters
+                    processAndDisplayCapturedImage(photoFile)
+                    
+                    isProcessing = false
+                }
+
+                override fun onError(exc: ImageCaptureException) {
+                    Log.e(TAG, "Image capture failed: ${exc.message}", exc)
+                    showToast("Capture failed: ${exc.message}")
+                    isProcessing = false
+                }
+            }
+        )
+    }
+
+    /**
+     * Process captured image with selected filter
+     */
+    private fun processAndDisplayCapturedImage(imageFile: File) {
+        cameraExecutor.execute {
+            try {
+                // Load image
+                val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath)
+                if (bitmap == null) {
+                    Log.e(TAG, "Failed to decode image")
+                    return@execute
+                }
+
+                // Process with native layer if filter is selected
+                val processedBitmap = if (currentFilter != FilterType.ORIGINAL) {
+                    processImageWithNative(bitmap)
+                } else {
+                    bitmap
+                }
+
+                // Display result
+                runOnUiThread {
+                    // You could display in a dialog or toast
+                    showToast("Image processed with ${currentFilter.name}")
+                    Log.d(TAG, "Image processed successfully")
+                }
+
+                // Cleanup
+                if (processedBitmap != bitmap) {
+                    processedBitmap?.recycle()
+                }
+                bitmap.recycle()
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing captured image: ${e.message}", e)
+            }
+        }
+    }
+
+    // ==================== FILTER MANAGEMENT ====================
+
+    /**
+     * Set filter type and update native layer
+     */
+    private fun setFilter(filterType: FilterType) {
+        currentFilter = filterType
+        
+        try {
+            val result = setFilterNative(filterType.value)
+            if (result) {
+                Log.d(TAG, "Filter set to: ${filterType.name}")
+                updateFilterUI()
+            } else {
+                Log.e(TAG, "Failed to set filter in native layer")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception setting filter: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Update filter UI to show currently selected filter
+     */
+    private fun updateFilterUI() {
+        binding.apply {
+            // Update button colors
+            grayscaleButton.backgroundTintList = when (currentFilter) {
+                FilterType.GRAYSCALE -> android.content.res.ColorStateList.valueOf(resources.getColor(R.color.filter_active, theme))
+                else -> android.content.res.ColorStateList.valueOf(resources.getColor(R.color.filter_inactive, theme))
+            }
+
+            cannyEdgeButton.backgroundTintList = when (currentFilter) {
+                FilterType.CANNY_EDGE -> android.content.res.ColorStateList.valueOf(resources.getColor(R.color.filter_active, theme))
+                else -> android.content.res.ColorStateList.valueOf(resources.getColor(R.color.filter_inactive, theme))
+            }
+
+            originalButton.backgroundTintList = when (currentFilter) {
+                FilterType.ORIGINAL -> android.content.res.ColorStateList.valueOf(resources.getColor(R.color.filter_active, theme))
+                else -> android.content.res.ColorStateList.valueOf(resources.getColor(R.color.filter_inactive, theme))
+            }
+
+            // Update filter text
+            filterText.text = currentFilter.displayName
+        }
+    }
+
+    // ==================== JNI IMAGE PROCESSING ====================
+
+    /**
+     * Process image using native C++ layer
+     */
+    private fun processImageWithNative(bitmap: Bitmap): Bitmap? {
+        return try {
+            // Convert bitmap to byte array
+            val width = bitmap.width
+            val height = bitmap.height
+            val pixels = IntArray(width * height)
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+            val inputData = pixels.map { it.toByte() }.toByteArray()
+
+            // Call native function
+            val outputData = processFrameNative(inputData, width, height, currentFilter.value)
+            
+            if (outputData != null) {
+                // Convert back to bitmap
+                val outputPixels = IntArray(outputData.size / 4)
+                for (i in outputPixels.indices) {
+                    val idx = i * 4
+                    outputPixels[i] = (
+                        (outputData[idx].toInt() and 0xFF) or
+                        ((outputData[idx + 1].toInt() and 0xFF) shl 8) or
+                        ((outputData[idx + 2].toInt() and 0xFF) shl 16) or
+                        ((outputData[idx + 3].toInt() and 0xFF) shl 24)
+                    )
+                }
+                val resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                resultBitmap.setPixels(outputPixels, 0, width, 0, 0, width, height)
+                Log.d(TAG, "Native image processing completed")
+                resultBitmap
+            } else {
+                Log.e(TAG, "Native processing returned null")
+                bitmap
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in native image processing: ${e.message}", e)
+            bitmap
+        }
+    }
+
+    // ==================== OPENGL RENDERING ====================
+
+    /**
+     * Initialize OpenGL ES renderer
+     */
+    private fun initializeOpenGLRenderer() {
+        try {
+            glRenderer = OpenGLRenderer(binding.glSurfaceView) { initialized ->
+                if (initialized) {
+                    isGLInitialized = true
+                    Log.d(TAG, "OpenGL renderer initialized successfully")
+                } else {
+                    Log.e(TAG, "Failed to initialize OpenGL renderer")
+                }
+            }
+            Log.d(TAG, "OpenGL initialization started")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing OpenGL: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Render frame using OpenGL ES
+     */
+    private fun renderFrameOpenGL(textureId: Int, width: Int, height: Int) {
+        try {
+            if (isGLInitialized) {
+                val result = renderFrameNative(textureId, width, height)
+                if (!result) {
+                    Log.e(TAG, "Native OpenGL rendering failed")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error rendering frame: ${e.message}", e)
+        }
+    }
+
+    // ==================== APP MODE SWITCHING ====================
+
+    /**
+     * Switch to gallery mode
+     */
+    private fun switchToGalleryMode() {
+        currentMode = AppMode.GALLERY
+        setupGalleryMode()
+        showToast("Gallery mode")
+        Log.d(TAG, "Switched to gallery mode")
+    }
+
+    /**
+     * Setup gallery mode
+     */
+    private fun setupGalleryMode() {
+        // Hide camera preview
+        binding.previewView.visibility = View.GONE
+        
+        // Show gallery UI (if available)
+        try {
+            val galleryView = binding.root.findViewById<View>(R.id.gallery_view)
+            galleryView.visibility = View.VISIBLE
+        } catch (e: Exception) {
+            Log.d(TAG, "Gallery view not found")
+        }
+
+        Log.d(TAG, "Gallery mode setup complete")
+    }
+
+    /**
+     * Switch to settings mode
+     */
+    private fun switchToSettingsMode() {
+        currentMode = AppMode.SETTINGS
+        setupSettingsMode()
+        showToast("Settings mode")
+        Log.d(TAG, "Switched to settings mode")
+    }
+
+    /**
+     * Setup settings mode
+     */
+    private fun setupSettingsMode() {
+        // Hide camera preview
+        binding.previewView.visibility = View.GONE
+
+        // Show settings UI (if available)
+        try {
+            val settingsView = binding.root.findViewById<View>(R.id.settings_view)
+            settingsView.visibility = View.VISIBLE
+        } catch (e: Exception) {
+            Log.d(TAG, "Settings view not found")
+        }
+
+        Log.d(TAG, "Settings mode setup complete")
+    }
+
+    // ==================== UTILITY METHODS ====================
+
+    /**
+     * Show toast message
+     */
+    private fun showToast(message: String) {
+        runOnUiThread {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * Update FPS counter
+     */
+    private fun updateFpsCounter() {
+        frameCount++
+        val currentTime = System.currentTimeMillis()
+        val elapsed = currentTime - lastFpsUpdateTime
+
+        if (elapsed >= 1000) {
+            currentFps = (frameCount * 1000.0) / elapsed
+            frameCount = 0
+            lastFpsUpdateTime = currentTime
+
+            runOnUiThread {
+                binding.fpsText.text = String.format("%.1f FPS", currentFps)
+            }
+
+            Log.d(TAG, "FPS: $currentFps")
+        }
+    }
+
+    // ==================== ENUMS ====================
+
+    /**
+     * App operation modes
+     */
+    enum class AppMode {
+        CAMERA,
+        GALLERY,
+        SETTINGS
+    }
+
+    /**
+     * Available image filters
+     */
+    enum class FilterType(val value: Int, val displayName: String) {
+        ORIGINAL(2, "Original"),
+        GRAYSCALE(0, "Grayscale"),
+        CANNY_EDGE(1, "Canny Edge")
+    }
+}

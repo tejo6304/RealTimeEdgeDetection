@@ -1,0 +1,177 @@
+
+> Task :app:externalNativeBuildCleanDebug
+Clean realtimeedgedetection-armeabi-v7a
+Clean realtimeedgedetection-arm64-v8a
+Clean realtimeedgedetection-x86
+Clean realtimeedgedetection-x86_64
+
+> Task :app:externalNativeBuildCleanRelease
+Clean realtimeedgedetection-armeabi-v7a
+Clean realtimeedgedetection-arm64-v8a
+Clean realtimeedgedetection-x86
+Clean realtimeedgedetection-x86_64
+
+> Task :app:clean
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:dataBindingMergeDependencyArtifactsDebug
+> Task :app:generateDebugResValues
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:compileDebugNavigationResources
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:javaPreCompileDebug
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:processDebugManifestForPackage
+> Task :app:desugarDebugFileDependencies
+> Task :app:compressDebugAssets
+> Task :app:checkDebugDuplicateClasses
+> Task :app:configureCMakeDebug[arm64-v8a]
+> Task :app:mergeLibDexDebug
+> Task :app:mergeDebugResources
+
+> Task :app:buildCMakeDebug[arm64-v8a] FAILED
+C/C++: ninja: Entering directory `C:\Users\tejor\AndroidStudioProjects\RealTimeEdgeDetection\app\.cxx\Debug\14s6r5v6\arm64-v8a'
+C/C++: C:\Users\tejor\AppData\Local\Android\Sdk\ndk\27.0.12077973\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=aarch64-none-linux-android24 --sysroot=C:/Users/tejor/AppData/Local/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Drealtimeedgedetection_EXPORTS -IC:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp -isystem C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/sdk/native/jni/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -frtti -fexceptions -fno-limit-debug-info  -fPIC -g -std=gnu++11 -MD -MT CMakeFiles/realtimeedgedetection.dir/native-lib.cpp.o -MF CMakeFiles\realtimeedgedetection.dir\native-lib.cpp.o.d -o CMakeFiles/realtimeedgedetection.dir/native-lib.cpp.o -c C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:308:14: warning: format specifies type 'long long' but the argument has type 'int64_t' (aka 'long') [-Wformat]
+C/C++:   307 |              "Frames: %lld | Total time: %lldms | Avg: %ldms | FPS: %.1f",
+C/C++:       |                       ~~~~
+C/C++:       |                       %ld
+C/C++:   308 |              frameCount, frameProcessingTimeMs, avgTimeMs, fps);
+C/C++:       |              ^~~~~~~~~~
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:308:26: warning: format specifies type 'long long' but the argument has type 'int64_t' (aka 'long') [-Wformat]
+C/C++:   307 |              "Frames: %lld | Total time: %lldms | Avg: %ldms | FPS: %.1f",
+C/C++:       |                                          ~~~~
+C/C++:       |                                          %ld
+C/C++:   308 |              frameCount, frameProcessingTimeMs, avgTimeMs, fps);
+C/C++:       |                          ^~~~~~~~~~~~~~~~~~~~~
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:898:1: error: redefinition of 'Java_com_example_realtimeedgedetection_NativeImageProcessor_processGrayscale'
+C/C++:   898 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processGrayscale(
+C/C++:       | ^
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:670:1: note: previous definition is here
+C/C++:   670 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processGrayscale(
+C/C++:       | ^
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:969:1: error: redefinition of 'Java_com_example_realtimeedgedetection_NativeImageProcessor_processCannyEdge'
+C/C++:   969 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processCannyEdge(
+C/C++:       | ^
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:684:1: note: previous definition is here
+C/C++:   684 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processCannyEdge(
+C/C++:       | ^
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1055:1: error: redefinition of 'Java_com_example_realtimeedgedetection_NativeImageProcessor_processBitmap'
+C/C++:  1055 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processBitmap(
+C/C++:       | ^
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:587:1: note: previous definition is here
+C/C++:   587 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processBitmap(
+C/C++:       | ^
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1104:16: error: use of undeclared identifier 'outputArray'
+C/C++:  1104 |         return outputArray;
+C/C++:       |                ^
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1106:7: error: expected unqualified-id
+C/C++:  1106 |     } catch (const std::exception& e) {
+C/C++:       |       ^
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1110:1: error: extraneous closing brace ('}')
+C/C++:  1110 | }
+C/C++:       | ^
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1170:1: error: redefinition of 'Java_com_example_realtimeedgedetection_NativeImageProcessor_cleanup'
+C/C++:  1170 | Java_com_example_realtimeedgedetection_NativeImageProcessor_cleanup(
+C/C++:       | ^
+C/C++: C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1082:1: note: previous definition is here
+C/C++:  1082 | Java_com_example_realtimeedgedetection_NativeImageProcessor_cleanup(
+C/C++:       | ^
+C/C++: 2 warnings and 7 errors generated.
+
+> Task :app:mergeExtDexDebug
+
+[Incubating] Problems report is available at: file:///C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:buildCMakeDebug[arm64-v8a]'.
+> com.android.ide.common.process.ProcessException: ninja: Entering directory `C:\Users\tejor\AndroidStudioProjects\RealTimeEdgeDetection\app\.cxx\Debug\14s6r5v6\arm64-v8a'
+  [1/3] Building CXX object CMakeFiles/realtimeedgedetection.dir/image_processor.cpp.o
+  [2/3] Building CXX object CMakeFiles/realtimeedgedetection.dir/native-lib.cpp.o
+  FAILED: CMakeFiles/realtimeedgedetection.dir/native-lib.cpp.o 
+  C:\Users\tejor\AppData\Local\Android\Sdk\ndk\27.0.12077973\toolchains\llvm\prebuilt\windows-x86_64\bin\clang++.exe --target=aarch64-none-linux-android24 --sysroot=C:/Users/tejor/AppData/Local/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Drealtimeedgedetection_EXPORTS -IC:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp -isystem C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/sdk/native/jni/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -frtti -fexceptions -fno-limit-debug-info  -fPIC -g -std=gnu++11 -MD -MT CMakeFiles/realtimeedgedetection.dir/native-lib.cpp.o -MF CMakeFiles\realtimeedgedetection.dir\native-lib.cpp.o.d -o CMakeFiles/realtimeedgedetection.dir/native-lib.cpp.o -c C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:308:14: warning: format specifies type 'long long' but the argument has type 'int64_t' (aka 'long') [-Wformat]
+    307 |              "Frames: %lld | Total time: %lldms | Avg: %ldms | FPS: %.1f",
+        |                       ~~~~
+        |                       %ld
+    308 |              frameCount, frameProcessingTimeMs, avgTimeMs, fps);
+        |              ^~~~~~~~~~
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:308:26: warning: format specifies type 'long long' but the argument has type 'int64_t' (aka 'long') [-Wformat]
+    307 |              "Frames: %lld | Total time: %lldms | Avg: %ldms | FPS: %.1f",
+        |                                          ~~~~
+        |                                          %ld
+    308 |              frameCount, frameProcessingTimeMs, avgTimeMs, fps);
+        |                          ^~~~~~~~~~~~~~~~~~~~~
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:898:1: error: redefinition of 'Java_com_example_realtimeedgedetection_NativeImageProcessor_processGrayscale'
+    898 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processGrayscale(
+        | ^
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:670:1: note: previous definition is here
+    670 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processGrayscale(
+        | ^
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:969:1: error: redefinition of 'Java_com_example_realtimeedgedetection_NativeImageProcessor_processCannyEdge'
+    969 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processCannyEdge(
+        | ^
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:684:1: note: previous definition is here
+    684 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processCannyEdge(
+        | ^
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1055:1: error: redefinition of 'Java_com_example_realtimeedgedetection_NativeImageProcessor_processBitmap'
+   1055 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processBitmap(
+        | ^
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:587:1: note: previous definition is here
+    587 | Java_com_example_realtimeedgedetection_NativeImageProcessor_processBitmap(
+        | ^
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1104:16: error: use of undeclared identifier 'outputArray'
+   1104 |         return outputArray;
+        |                ^
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1106:7: error: expected unqualified-id
+   1106 |     } catch (const std::exception& e) {
+        |       ^
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1110:1: error: extraneous closing brace ('}')
+   1110 | }
+        | ^
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1170:1: error: redefinition of 'Java_com_example_realtimeedgedetection_NativeImageProcessor_cleanup'
+   1170 | Java_com_example_realtimeedgedetection_NativeImageProcessor_cleanup(
+        | ^
+  C:/Users/tejor/AndroidStudioProjects/RealTimeEdgeDetection/app/src/main/cpp/native-lib.cpp:1082:1: note: previous definition is here
+   1082 | Java_com_example_realtimeedgedetection_NativeImageProcessor_cleanup(
+        | ^
+  2 warnings and 7 errors generated.
+  ninja: build stopped: subcommand failed.
+  
+  C++ build system [build] failed while executing:
+      @echo off
+      "C:\\Users\\tejor\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe" ^
+        -C ^
+        "C:\\Users\\tejor\\AndroidStudioProjects\\RealTimeEdgeDetection\\app\\.cxx\\Debug\\14s6r5v6\\arm64-v8a" ^
+        realtimeedgedetection
+    from C:\Users\tejor\AndroidStudioProjects\RealTimeEdgeDetection\app
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 26s
+29 actionable tasks: 29 executed

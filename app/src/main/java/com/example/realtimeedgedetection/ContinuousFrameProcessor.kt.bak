@@ -1,0 +1,263 @@
+package com.example.realtimeedgedetection
+
+import android.graphics.Bitmap
+import android.util.Log
+import androidx.camera.core.ImageProxy
+import org.opencv.core.*
+import org.opencv.imgproc.Imgproc
+import kotlin.math.min
+
+/**
+ * Continuous frame processor for real-time camera filter application.
+ * Processes each camera frame and applies selected filters (Canny edge detection, grayscale).
+ * Optimized for smooth playback at 30+ FPS.
+ */
+class ContinuousFrameProcessor {
+
+    companion object {
+        private const val TAG = "ContinuousFrameProcessor"
+        // Canny edge detection thresholds
+        private const val CANNY_THRESHOLD_LOW = 50.0
+        private const val CANNY_THRESHOLD_HIGH = 150.0
+        // Downscale factor for processing speed optimization
+        private const val DOWNSCALE_FACTOR = 2
+    }
+
+    private var currentFilter = FilterType.ORIGINAL
+    private var processingMat: Mat? = null
+    private var grayMat: Mat? = null
+    private var edgeMat: Mat? = null
+    
+    // Performance tracking
+    private var frameCount = 0
+    private var processingTimeMs = 0L
+    private var lastReportTime = System.currentTimeMillis()
+
+    init {
+        Log.d(TAG, "ContinuousFrameProcessor initialized")
+    }
+
+    /**
+     * Set the filter type for processing
+     */
+    fun setFilterType(filter: FilterType) {
+        this.currentFilter = filter
+        Log.d(TAG, "Filter changed to: $filter")
+    }
+
+    /**
+     * Process a single camera frame with selected filter
+     * @param imageProxy Camera frame to process
+     * @return Processed bitmap or null if processing fails
+     */
+    fun processFrame(imageProxy: ImageProxy): Bitmap? {
+        return try {
+            val startTime = System.currentTimeMillis()
+            
+            // Convert ImageProxy to Bitmap
+            val originalBitmap = imageProxyToBitmap(imageProxy) ?: return null
+            
+            // Apply filter based on current selection
+            val processedBitmap = when (currentFilter) {
+                FilterType.ORIGINAL -> originalBitmap
+                FilterType.GRAYSCALE -> applyGrayscaleFilter(originalBitmap)
+                FilterType.CANNY_EDGE -> applyCannyEdgeFilter(originalBitmap)
+            }
+            
+            // Track performance
+            val elapsedTime = System.currentTimeMillis() - startTime
+            processingTimeMs = elapsedTime
+            updatePerformanceMetrics()
+            
+            processedBitmap
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing frame: ${e.message}", e)
+            null
+        }
+    }
+
+    /**
+     * Convert ImageProxy to Bitmap
+     * Handles RGBA_8888 format with proper conversion
+     */
+    private fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap? {
+        return try {
+            val image = imageProxy.image ?: return null
+            val planes = image.planes
+            val buffer = planes[0].buffer
+            buffer.rewind()
+            
+            val pixelStride = planes[0].pixelStride
+            val padding = (planes[0].rowPadding / pixelStride).coerceAtLeast(0)
+            val w = imageProxy.width + padding
+            val h = imageProxy.height
+            
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            bitmap.copyPixelsFromBuffer(buffer)
+            
+            // Crop to actual image size
+            Bitmap.createBitmap(bitmap, 0, 0, imageProxy.width, imageProxy.height)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error converting ImageProxy to Bitmap: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Apply grayscale filter to bitmap
+     */
+    private fun applyGrayscaleFilter(bitmap: Bitmap): Bitmap {
+        return try {
+            // Convert Bitmap to Mat
+            val src = Mat()
+            org.opencv.android.Utils.bitmapToMat(bitmap, src)
+            
+            // Convert to grayscale
+            val gray = Mat()
+            Imgproc.cvtColor(src, gray, Imgproc.COLOR_RGBA2GRAY)
+            
+            // Convert back to RGBA for display
+            val result = Mat()
+            Imgproc.cvtColor(gray, result, Imgproc.COLOR_GRAY2RGBA)
+            
+            // Convert Mat back to Bitmap
+            val outputBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+            org.opencv.android.Utils.matToBitmap(result, outputBitmap)
+            
+            // Release OpenCV resources
+            src.release()
+            gray.release()
+            result.release()
+            bitmap.recycle()
+            
+            outputBitmap
+        } catch (e: Exception) {
+            Log.e(TAG, "Error applying grayscale filter: ${e.message}", e)
+            bitmap
+        }
+    }
+
+    /**
+     * Apply Canny edge detection filter to bitmap
+     * Optimized for real-time performance
+     */
+    private fun applyCannyEdgeFilter(bitmap: Bitmap): Bitmap {
+        return try {
+            // Convert Bitmap to Mat
+            val src = Mat()
+            org.opencv.android.Utils.bitmapToMat(bitmap, src)
+            
+            // Downscale for faster processing if large image
+            val downscaledMat = if (src.width > 640 || src.height > 480) {
+                val scaled = Mat()
+                Imgproc.resize(
+                    src,
+                    scaled,
+                    Size(src.width / DOWNSCALE_FACTOR.toDouble(), src.height / DOWNSCALE_FACTOR.toDouble())
+                )
+                scaled
+            } else {
+                src
+            }
+            
+            // Convert to grayscale
+            val gray = Mat()
+            Imgproc.cvtColor(downscaledMat, gray, Imgproc.COLOR_RGBA2GRAY)
+            
+            // Apply Gaussian blur for noise reduction
+            val blurred = Mat()
+            Imgproc.GaussianBlur(gray, blurred, Size(5.0, 5.0), 0.0)
+            
+            // Apply Canny edge detection
+            val edges = Mat()
+            Imgproc.Canny(blurred, edges, CANNY_THRESHOLD_LOW, CANNY_THRESHOLD_HIGH)
+            
+            // Upscale back to original size if we downscaled
+            val edgesResized = if (src.width > 640 || src.height > 480) {
+                val upscaled = Mat()
+                Imgproc.resize(
+                    edges,
+                    upscaled,
+                    Size(src.width.toDouble(), src.height.toDouble())
+                )
+                upscaled
+            } else {
+                edges
+            }
+            
+            // Convert edges (grayscale) to RGBA for display
+            val result = Mat()
+            Imgproc.cvtColor(edgesResized, result, Imgproc.COLOR_GRAY2RGBA)
+            
+            // Convert Mat back to Bitmap
+            val outputBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+            org.opencv.android.Utils.matToBitmap(result, outputBitmap)
+            
+            // Release OpenCV resources
+            src.release()
+            downscaledMat.release()
+            gray.release()
+            blurred.release()
+            edges.release()
+            edgesResized.release()
+            result.release()
+            bitmap.recycle()
+            
+            outputBitmap
+        } catch (e: Exception) {
+            Log.e(TAG, "Error applying Canny edge filter: ${e.message}", e)
+            bitmap
+        }
+    }
+
+    /**
+     * Track and report performance metrics
+     */
+    private fun updatePerformanceMetrics() {
+        frameCount++
+        val currentTime = System.currentTimeMillis()
+        
+        if (currentTime - lastReportTime >= 2000) { // Report every 2 seconds
+            val fps = (frameCount * 1000.0) / (currentTime - lastReportTime)
+            Log.d(TAG, "Performance - FPS: ${"%.1f".format(fps)}, " +
+                    "Processing time: ${processingTimeMs}ms, Filter: $currentFilter")
+            frameCount = 0
+            lastReportTime = currentTime
+        }
+    }
+
+    /**
+     * Get current FPS
+     */
+    fun getCurrentFps(): Double {
+        return if (processingTimeMs > 0) {
+            1000.0 / processingTimeMs
+        } else {
+            0.0
+        }
+    }
+
+    /**
+     * Get current processing time in milliseconds
+     */
+    fun getProcessingTimeMs(): Long {
+        return processingTimeMs
+    }
+
+    /**
+     * Clean up resources
+     */
+    fun cleanup() {
+        try {
+            processingMat?.release()
+            grayMat?.release()
+            edgeMat?.release()
+            processingMat = null
+            grayMat = null
+            edgeMat = null
+            Log.d(TAG, "Resources cleaned up")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during cleanup: ${e.message}")
+        }
+    }
+}

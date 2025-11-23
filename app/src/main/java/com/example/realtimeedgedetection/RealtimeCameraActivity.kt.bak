@@ -1,0 +1,317 @@
+package com.example.realtimeedgedetection
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageFormat
+import android.os.Bundle
+import android.util.Log
+import android.view.View
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.RadioButton
+import android.widget.RadioGroup
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.example.realtimeedgedetection.databinding.ActivityRealtimeCameraBinding
+
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import kotlin.math.roundToInt
+
+/**
+ * Real-time camera activity with live filter preview using CameraX and OpenCV.
+ * Displays Canny edge detection and Grayscale filters in real-time.
+ * Processes every frame with continuous real-time filtering.
+ */
+class RealtimeCameraActivity : AppCompatActivity() {
+
+    companion object {
+        private const val TAG = "RealtimeCameraActivity"
+        private const val CAMERA_PERMISSION_REQUEST = 100
+        private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
+    }
+
+    private lateinit var binding: ActivityRealtimeCameraBinding
+    private lateinit var cameraExecutor: ExecutorService
+    private lateinit var imageCapture: ImageCapture
+    private lateinit var previewView: PreviewView
+    private lateinit var filterResultView: ImageView
+    private lateinit var captureButton: Button
+    private lateinit var filterGroup: RadioGroup
+    private lateinit var filterStatusText: TextView
+    private lateinit var fpsText: TextView
+    private lateinit var frameProcessor: ContinuousFrameProcessor
+
+    private var currentFilter = FilterType.ORIGINAL
+    private var lastProcessedBitmap: Bitmap? = null
+    
+    // FPS tracking
+    private var frameCount = 0
+    private var lastFpsTime = System.currentTimeMillis()
+    private var currentFps = 0.0
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityRealtimeCameraBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        // Initialize continuous frame processor
+        frameProcessor = ContinuousFrameProcessor()
+        Log.i(TAG, "Camera activity started - Real-time filters enabled")
+
+        initializeViews()
+        cameraExecutor = Executors.newSingleThreadExecutor()
+
+        if (!allPermissionsGranted()) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                CAMERA_PERMISSION_REQUEST
+            )
+        } else {
+            startCamera()
+        }
+    }
+
+    private fun initializeViews() {
+        previewView = binding.previewView
+        filterResultView = binding.filterResultView
+        captureButton = binding.captureButton
+        filterGroup = binding.filterGroup
+        filterStatusText = binding.filterStatusText
+        fpsText = binding.fpsText
+
+        // Initially show preview, hide filter result
+        previewView.visibility = View.GONE
+        filterResultView.visibility = View.VISIBLE
+
+        // Set up filter radio buttons with real-time processor
+        binding.originalRadio.setOnClickListener {
+            currentFilter = FilterType.ORIGINAL
+            frameProcessor.setFilterType(FilterType.ORIGINAL)
+            updateFilterStatus()
+            Log.d(TAG, "Filter changed to: ORIGINAL")
+        }
+        binding.grayscaleRadio.setOnClickListener {
+            currentFilter = FilterType.GRAYSCALE
+            frameProcessor.setFilterType(FilterType.GRAYSCALE)
+            updateFilterStatus()
+            Log.d(TAG, "Filter changed to: GRAYSCALE")
+        }
+        binding.cannyRadio.setOnClickListener {
+            currentFilter = FilterType.CANNY_EDGE
+            frameProcessor.setFilterType(FilterType.CANNY_EDGE)
+            updateFilterStatus()
+            Log.d(TAG, "Filter changed to: CANNY_EDGE")
+        }
+
+        // Set capture button listener
+        captureButton.setOnClickListener {
+            captureAndSaveImage()
+        }
+        
+        updateFilterStatus()
+    }
+
+    private fun setupCamera() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+
+        cameraProviderFuture.addListener({
+            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+
+            // ImageCapture use case
+            imageCapture = ImageCapture.Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .build()
+
+            // ImageAnalysis for real-time filter processing
+            val imageAnalysis = ImageAnalysis.Builder()
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExecutor) { imageProxy ->
+                        processImage(imageProxy)
+                    }
+                }
+
+            // Select back camera
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            try {
+                // Unbind use cases before rebinding
+                cameraProvider.unbindAll()
+
+                // Bind use cases to camera (no Preview - we show filtered frames directly)
+                cameraProvider.bindToLifecycle(
+                    this,
+                    cameraSelector,
+                    imageCapture,
+                    imageAnalysis
+                )
+                Log.d(TAG, "Camera setup complete - Real-time filter mode active")
+                Toast.makeText(this, "Camera ready - Filters active", Toast.LENGTH_SHORT).show()
+            } catch (exc: Exception) {
+                Log.e(TAG, "Use case binding failed", exc)
+                Toast.makeText(this, "Camera binding failed: ${exc.message}", Toast.LENGTH_SHORT).show()
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun processImage(imageProxy: androidx.camera.core.ImageProxy) {
+        try {
+            // Process frame with real-time filter
+            val processedBitmap = frameProcessor.processFrame(imageProxy)
+            if (processedBitmap != null) {
+                lastProcessedBitmap = processedBitmap
+
+                // Update UI with processed frame
+                runOnUiThread {
+                    filterResultView.setImageBitmap(processedBitmap)
+                    updateFps()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing image: ${e.message}", e)
+        } finally {
+            imageProxy.close()
+        }
+    }
+
+    @OptIn(ExperimentalGetImage::class)
+    private fun imageProxyToBitmap(imageProxy: androidx.camera.core.ImageProxy): Bitmap? {
+        return try {
+            val planes = imageProxy.image?.planes ?: return null
+            val buffer = planes[0].buffer
+            buffer.rewind()
+            val pixelStride = planes[0].pixelStride
+            val padding = (planes[0].rowPadding / pixelStride).coerceAtLeast(0)
+            val w = imageProxy.width + padding
+            val h = imageProxy.height
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            bitmap.copyPixelsFromBuffer(buffer)
+
+            // Crop to actual image size
+            return Bitmap.createBitmap(bitmap, 0, 0, imageProxy.width, imageProxy.height)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error converting image proxy to bitmap: ${e.message}")
+            null
+        }
+    }
+
+    private fun applyFilter(bitmap: Bitmap, filterType: FilterType): Bitmap {
+        // Filtering now handled by ContinuousFrameProcessor with OpenCV
+        return bitmap
+    }
+
+    // Grayscale filter - now handled by processor
+    private fun applyGrayscale(mat: Any, originalBitmap: Bitmap): Bitmap {
+        return originalBitmap
+    }
+
+    // Canny edge detection filter - now handled by processor
+    private fun applyCanny(mat: Any, originalBitmap: Bitmap): Bitmap {
+        return originalBitmap
+    }
+
+    private fun captureAndSaveImage() {
+        try {
+            // Save the currently displayed bitmap (no filter processing)
+            if (lastProcessedBitmap != null) {
+                val file = createImageFile()
+                val bitmap = lastProcessedBitmap!!
+
+                // Save to file
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, file.outputStream())
+                Toast.makeText(
+                    this,
+                    "Image saved: ${file.name}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                Log.d(TAG, "Image saved to ${file.absolutePath}")
+            } else {
+                Toast.makeText(this, "No image to save", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error capturing image: ${e.message}")
+            Toast.makeText(this, "Failed to capture image", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun createImageFile(): File {
+        val timeStamp = SimpleDateFormat(FILENAME_FORMAT, Locale.US).format(System.currentTimeMillis())
+        val storageDir = getExternalFilesDir("Pictures")!!
+        return File.createTempFile("IMG_$timeStamp", ".jpg", storageDir)
+    }
+
+    private fun allPermissionsGranted() =
+        ContextCompat.checkSelfPermission(
+            baseContext, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == CAMERA_PERMISSION_REQUEST) {
+            if (allPermissionsGranted()) {
+                startCamera()
+            } else {
+                Toast.makeText(this, "Camera permission denied", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+        }
+    }
+
+    private fun startCamera() {
+        setupCamera()
+    }
+    
+    private fun updateFilterStatus() {
+        val filterName = when (currentFilter) {
+            FilterType.ORIGINAL -> "ORIGINAL"
+            FilterType.GRAYSCALE -> "GRAYSCALE"
+            FilterType.CANNY_EDGE -> "CANNY EDGE"
+        }
+        filterStatusText.text = "Filter: $filterName"
+    }
+    
+    private fun updateFps() {
+        frameCount++
+        val currentTime = System.currentTimeMillis()
+        val elapsed = currentTime - lastFpsTime
+        
+        if (elapsed >= 1000) { // Update every second
+            currentFps = (frameCount * 1000.0) / elapsed
+            fpsText.text = String.format("FPS: %.1f", currentFps)
+            frameCount = 0
+            lastFpsTime = currentTime
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        lastProcessedBitmap?.recycle()
+        lastProcessedBitmap = null
+        frameProcessor.cleanup()
+        cameraExecutor.shutdown()
+    }
+}
