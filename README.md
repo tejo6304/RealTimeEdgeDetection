@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![App Demo](images/IMG-20251123-WA0003.jpg)
+![App Demo](/IMG-20251123-WA0003.jpg)
 
 **A high-performance Android camera application with real-time image processing capabilities**
 
@@ -65,22 +65,22 @@ The DataFlowController manages the entire processing pipeline, coordinating data
 <table>
   <tr>
     <td align="center">
-      <img src="images/IMG-20251123-WA0003.jpg" width="200px" />
+      <img src="/IMG-20251123-WA0003.jpg" width="200px" />
       <br />
       <em>Main Camera View</em>
     </td>
     <td align="center">
-      <img src="images/IMG-20251123-WA0004.jpg" width="200px" />
+      <img src="/IMG-20251123-WA0004.jpg" width="200px" />
       <br />
       <em>Edge Detection Filter</em>
     </td>
     <td align="center">
-      <img src="images/IMG-20251123-WA0005.jpg" width="200px" />
+      <img src="/IMG-20251123-WA0005.jpg" width="200px" />
       <br />
       <em>Grayscale Filter</em>
     </td>
     <td align="center">
-      <img src="images/IMG-20251123-WA0006.jpg" width="200px" />
+      <img src="/IMG-20251123-WA0006.jpg" width="200px" />
       <br />
       <em>Filter UI Controls</em>
     </td>
@@ -93,7 +93,7 @@ The DataFlowController manages the entire processing pipeline, coordinating data
 
 https://github.com/user-attachments/assets/your-video-id-here
 
-> **Note**: Upload `images/VID-20251123-WA0002.mp4` to GitHub releases or use a video hosting service, then update the link above.
+> **Note**: Upload `/VID-20251123-WA0002.mp4` to GitHub releases or use a video hosting service, then update the link above.
 
 ---
 
