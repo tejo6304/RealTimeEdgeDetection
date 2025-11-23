@@ -80,7 +80,7 @@ The DataFlowController manages the entire processing pipeline, coordinating data
       <em>Raw Image</em>
     </td>
     <td align="center">
-      <img src="/IMG-20251123-WA0006.jpg" width="200px" />
+      <img src="/WhatsApp Image 2025-11-23 at 15.58.45_9b7532e6.jpg" width="200px" />
       <br />
       <em>Homepage</em>
     </td>
